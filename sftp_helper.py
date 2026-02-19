@@ -43,28 +43,60 @@ def upload_to_sftp(csv_content, filename, host, port, username, password, remote
         # Open SFTP session
         sftp = ssh.open_sftp()
         
+        # Normalize the remote path
+        remote_path = remote_path.rstrip('/')
+        
+        # Try to create directory if it doesn't exist
+        try:
+            sftp.stat(remote_path)
+        except FileNotFoundError:
+            # Directory doesn't exist, try to create it
+            try:
+                # Create parent directories if needed
+                dirs = remote_path.split('/')
+                current_path = ''
+                for dir_name in dirs:
+                    if dir_name:  # Skip empty strings
+                        current_path += '/' + dir_name
+                        try:
+                            sftp.stat(current_path)
+                        except FileNotFoundError:
+                            sftp.mkdir(current_path)
+            except Exception as mkdir_error:
+                # If we can't create, try uploading anyway (might have write permission without mkdir)
+                pass
+        
         # Convert string content to file-like object
         file_obj = io.BytesIO(csv_content.encode('utf-8'))
         
         # Construct remote file path
-        remote_file = f"{remote_path.rstrip('/')}/{filename}"
+        remote_file = f"{remote_path}/{filename}"
         
         # Upload file
         sftp.putfo(file_obj, remote_file)
+        
+        # Verify upload
+        try:
+            file_stat = sftp.stat(remote_file)
+            file_size = file_stat.st_size
+        except:
+            file_size = "unknown"
         
         # Close connections
         sftp.close()
         ssh.close()
         
         upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        return True, f"File uploaded successfully to {remote_file} at {upload_time}"
+        return True, f"✅ File uploaded successfully!\nPath: {remote_file}\nSize: {file_size} bytes\nTime: {upload_time}"
         
     except paramiko.AuthenticationException:
-        return False, "Authentication failed. Please check username and password."
+        return False, "❌ Authentication failed. Please check username and password."
     except paramiko.SSHException as e:
-        return False, f"SSH connection error: {str(e)}"
+        return False, f"❌ SSH connection error: {str(e)}"
+    except PermissionError as e:
+        return False, f"❌ Permission denied. Cannot write to {remote_path}. Check directory permissions."
     except Exception as e:
-        return False, f"Upload failed: {str(e)}"
+        return False, f"❌ Upload failed: {str(e)}\nPath attempted: {remote_path}/{filename}"
 
 def test_sftp_connection(host, port, username, password):
     """
