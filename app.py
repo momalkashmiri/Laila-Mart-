@@ -240,15 +240,30 @@ def main_app():
     st.markdown("---")
     
     # Load template
-    template_path = "/mnt/user-data/uploads/Laila_Mart_is6o.csv"
+    # Try multiple paths for different deployment environments
+    template_paths = [
+        "Laila_Mart_is6o.csv",  # Cloud deployment
+        "/mnt/user-data/uploads/Laila_Mart_is6o.csv",  # Local development
+        "./Laila_Mart_is6o.csv"  # Alternative path
+    ]
     
-    try:
-        template_df = pd.read_csv(template_path)
-        st.success(f"✅ Template loaded successfully ({len(template_df)} items)")
-    except Exception as e:
-        st.error(f"❌ Error loading template: {str(e)}")
-        st.info("Please upload the Laila_Mart_is6o.csv template file first.")
+    template_df = None
+    template_path = None
+    
+    for path in template_paths:
+        try:
+            template_df = pd.read_csv(path)
+            template_path = path
+            break
+        except FileNotFoundError:
+            continue
+    
+    if template_df is None:
+        st.error("❌ Template file 'Laila_Mart_is6o.csv' not found!")
+        st.info("Please ensure the template file is uploaded to your repository.")
         return
+    
+    st.success(f"✅ Template loaded successfully ({len(template_df)} items)")
     
     # File upload section
     st.markdown("### 📤 Upload Stock Report")
