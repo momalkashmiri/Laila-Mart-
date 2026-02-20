@@ -125,9 +125,17 @@ def process_stock_report(stock_df: pd.DataFrame, template_df: pd.DataFrame) -> t
 
     result = merged.merge(stock_lookup, on="barcode", how="left")
 
-    # Fill unmatched rows with template values
-    result["price"] = result["price"].fillna(template_df["price"].values)
-    result["quantity"] = result["quantity"].fillna(template_df["quantity"].values)
+    # Fill unmatched rows with template values (use dict for safe alignment)
+    template_price = template_df.set_index("barcode")["price"]
+    template_qty = template_df.set_index("barcode")["quantity"]
+    result["price"] = result.apply(
+        lambda row: row["price"] if pd.notna(row["price"]) else template_price.get(row["barcode"], 0),
+        axis=1,
+    )
+    result["quantity"] = result.apply(
+        lambda row: row["quantity"] if pd.notna(row["quantity"]) else template_qty.get(row["barcode"], 0),
+        axis=1,
+    )
 
     # Active formula: IF(quantity > 3, 1, 0)
     result["active"] = (result["quantity"] > 3).astype(int)
