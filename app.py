@@ -155,9 +155,15 @@ def process_stock_report(stock_df: pd.DataFrame, template_df: pd.DataFrame) -> t
 
 
 def df_to_csv_bytes(df: pd.DataFrame) -> bytes:
+    df = df.copy()
+    # Force barcode as plain integer string — prevents scientific notation
+    df["barcode"] = df["barcode"].astype("int64").apply(lambda x: str(x))
+    df["quantity"] = df["quantity"].apply(lambda x: int(float(x))).astype(str)
     buf = io.StringIO()
-    df.to_csv(buf, index=False)
-    return buf.getvalue().encode("utf-8")
+    df.to_csv(buf, index=False, quoting=0)
+    # Remove any quotes around barcodes
+    result = buf.getvalue()
+    return result.encode("utf-8")
 
 
 # ── Login page ────────────────────────────────────────────────────────────────
