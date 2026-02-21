@@ -8,6 +8,9 @@ import pandas as pd
 import io
 import os
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -164,6 +167,69 @@ def df_to_csv_bytes(df: pd.DataFrame) -> bytes:
     # Remove any quotes around barcodes
     result = buf.getvalue()
     return result.encode("utf-8")
+
+# ── Email notification ────────────────────────────────────────────────────────
+def send_email_notification(stats: dict, source_filename: str, remote_path: str, ts: str, success: bool, error_msg: str = ""):
+    try:
+        cfg = st.secrets.get("email", {})
+        sender = cfg.get("sender_email", "")
+        app_password = cfg.get("sender_app_password", "")
+        recipients = [r.strip() for r in cfg.get("notification_emails", "").split(",") if r.strip()]
+
+        if not sender or not app_password or not recipients:
+            return False, "Email credentials not configured"
+
+        subject = f"✅ Laila Mart Upload SUCCESS - {ts}" if success else f"❌ Laila Mart Upload FAILED - {ts}"
+
+        if success:
+            body = f"""
+<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+<div style="background: #1e3a5f; padding: 20px; border-radius: 8px 8px 0 0;">
+  <h2 style="color: white; margin: 0;">✅ Stock Report Uploaded Successfully</h2>
+</div>
+<div style="background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr><td style="padding: 8px; color: #64748b;">📄 Source File</td><td style="padding: 8px; font-weight: bold;">{source_filename}</td></tr>
+    <tr style="background:#fff;"><td style="padding: 8px; color: #64748b;">📦 Total Items</td><td style="padding: 8px; font-weight: bold;">{stats["total"]:,}</td></tr>
+    <tr><td style="padding: 8px; color: #64748b;">🟢 Active Items</td><td style="padding: 8px; font-weight: bold; color: #16a34a;">{stats["active"]:,}</td></tr>
+    <tr style="background:#fff;"><td style="padding: 8px; color: #64748b;">🔴 Inactive Items</td><td style="padding: 8px; font-weight: bold; color: #dc2626;">{stats["inactive"]:,}</td></tr>
+    <tr><td style="padding: 8px; color: #64748b;">🕐 Upload Time</td><td style="padding: 8px; font-weight: bold;">{ts}</td></tr>
+    <tr style="background:#fff;"><td style="padding: 8px; color: #64748b;">📂 Server Path</td><td style="padding: 8px; font-size: 12px;">{remote_path}</td></tr>
+  </table>
+  <p style="color: #64748b; font-size: 12px; margin-top: 20px;">This is an automated notification from Laila Mart Stock Processor.</p>
+</div>
+</body></html>
+"""
+        else:
+            body = f"""
+<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+<div style="background: #dc2626; padding: 20px; border-radius: 8px 8px 0 0;">
+  <h2 style="color: white; margin: 0;">❌ Stock Report Upload FAILED</h2>
+</div>
+<div style="background: #fef2f2; padding: 20px; border: 1px solid #fecaca; border-radius: 0 0 8px 8px;">
+  <p><strong>File:</strong> {source_filename}</p>
+  <p><strong>Time:</strong> {ts}</p>
+  <p><strong>Error:</strong> {error_msg}</p>
+  <p style="color: #64748b; font-size: 12px;">Please check your SFTP credentials and try again.</p>
+</div>
+</body></html>
+"""
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = ", ".join(recipients)
+        msg.attach(MIMEText(body, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender, app_password)
+            server.sendmail(sender, recipients, msg.as_string())
+
+        return True, f"Email sent to {', '.join(recipients)}"
+    except Exception as e:
+        return False, f"Email failed: {e}"
+
+
 
 
 # ── Login page ────────────────────────────────────────────────────────────────
@@ -343,6 +409,18 @@ def render_app():
                             st.balloons()
                             file_kb = len(csv_bytes) / 1024
                             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            # Send email notification
+                            email_ok, email_msg = send_email_notification(
+                                stats=stats,
+                                source_filename=source_filename,
+                                remote_path=details.get("full_path", remote_path),
+                                ts=ts,
+                                success=True,
+                            )
+                            if email_ok:
+                                st.success(f"📧 Email notification sent!")
+                            else:
+                                st.warning(f"📧 Email not sent: {email_msg}")
 
                             st.markdown(f"""
                             <div class='success-box'>
@@ -377,6 +455,15 @@ def render_app():
                             })
                             st.session_state.upload_history = st.session_state.upload_history[:10]
                         else:
+                            # Send failure email
+                            send_email_notification(
+                                stats=stats,
+                                source_filename=source_filename,
+                                remote_path=remote_path,
+                                ts=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                success=False,
+                                error_msg=message,
+                            )
                             st.markdown(f"""
                             <div class='error-box'>
                                 <h3>❌ Upload Failed</h3>
