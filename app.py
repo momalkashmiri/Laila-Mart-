@@ -23,32 +23,62 @@ st.set_page_config(
 # ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    .stApp { background-color: #f8fafc; }
+    /* ── Main header always looks good ── */
     .main-header {
         background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
         padding: 2rem; border-radius: 12px; text-align: center;
-        color: white; margin-bottom: 2rem;
+        color: white !important; margin-bottom: 2rem;
     }
+    .main-header h1, .main-header p { color: white !important; }
+
+    /* ── Metric cards — light & dark aware ── */
     .metric-card {
-        background: white; border-radius: 10px; padding: 1.2rem;
-        border-left: 4px solid #2d6a9f; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-radius: 10px; padding: 1.2rem;
+        border-left: 4px solid #2d6a9f;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         text-align: center;
+        background: var(--background-color, white);
     }
-    .metric-value { font-size: 2rem; font-weight: bold; color: #1e3a5f; }
-    .metric-label { color: #64748b; font-size: 0.85rem; margin-top: 0.3rem; }
+    .metric-value { font-size: 2rem; font-weight: bold; }
+    .metric-label { font-size: 0.85rem; margin-top: 0.3rem; opacity: 0.75; }
+
+    /* ── Success box ── */
     .success-box {
-        background: #f0fdf4; border: 2px solid #22c55e;
+        border: 2px solid #22c55e;
         border-radius: 10px; padding: 1.5rem; margin: 1rem 0;
+        background: rgba(34, 197, 94, 0.1);
     }
+    .success-box h3 { color: #22c55e !important; }
+
+    /* ── Error box ── */
     .error-box {
-        background: #fef2f2; border: 2px solid #ef4444;
+        border: 2px solid #ef4444;
         border-radius: 10px; padding: 1.5rem; margin: 1rem 0;
+        background: rgba(239, 68, 68, 0.1);
     }
+    .error-box h3 { color: #ef4444 !important; }
+
+    /* ── Info box ── */
     .info-box {
-        background: #eff6ff; border: 2px solid #3b82f6;
+        border: 2px solid #3b82f6;
         border-radius: 10px; padding: 1.5rem; margin: 1rem 0;
+        background: rgba(59, 130, 246, 0.1);
     }
-    footer { text-align: center; color: #94a3b8; padding: 2rem; font-size: 0.8rem; }
+    .info-box strong { color: #3b82f6 !important; }
+    .info-box code {
+        background: rgba(59,130,246,0.15);
+        padding: 2px 6px; border-radius: 4px;
+        font-size: 0.85rem;
+    }
+
+    /* ── Footer ── */
+    footer { text-align: center; padding: 2rem; font-size: 0.8rem; opacity: 0.6; }
+    footer a { color: #3b82f6; }
+
+    /* ── Dark mode metric value colors ── */
+    @media (prefers-color-scheme: dark) {
+        .metric-card { background: rgba(255,255,255,0.05); }
+    }
 </style>
 """, unsafe_allow_html=True)
 
